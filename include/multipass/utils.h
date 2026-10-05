@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <multipass/logging/level.h>
+#include <multipass/logging/log_location.h>
 #include <multipass/network_interface_info.h>
 #include <multipass/path.h>
 #include <multipass/singleton.h>
@@ -28,11 +28,14 @@
 #include <yaml-cpp/yaml.h>
 
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <functional>
 #include <future>
 #include <ranges>
+#include <source_location>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <QDir>
@@ -52,6 +55,17 @@ class SSHSession;
 
 namespace utils
 {
+
+// Marks code that should never be reached: logs the location and aborts.
+[[noreturn]] inline void UNREACHABLE(std::string_view message,
+                                     std::source_location loc = std::source_location::current())
+{
+    logging::log_location(logging::Level::error,
+                          logging::detail::with_source_location<std::string_view>("FATAL", loc),
+                          "Reached unreachable code: {}",
+                          message);
+    std::abort();
+}
 
 // enum types
 enum class QuoteType
@@ -272,6 +286,8 @@ public:
     virtual Path default_mount_target(const Path& source) const;
     virtual Path normalize_mount_target(Path target_mount_path) const;
     virtual bool invalid_target_path(const Path& target_path) const; // needs normalized input path
+
+    virtual size_t max_instance_name_length(const Path& data_dir) const;
 };
 } // namespace multipass
 

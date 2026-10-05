@@ -73,27 +73,37 @@ elseif(CCACHE_PROGRAM)
   set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif()
 
+# vcpkg's CRT must match CMAKE_BUILD_TYPE, or the linker rejects the mismatch
+# (LNK2038). The release-only triplet is /MD-only, so force the debug/release
+# triplet whenever building Debug.
+if("${HOST_OS_NAME}" STREQUAL "Windows" AND (CMAKE_CONFIGURATION_TYPES OR CMAKE_BUILD_TYPE MATCHES "^[Dd]ebug$") AND NOT MULTIPASS_VCPKG_BUILD_DEFAULT)
+  message(STATUS "Enabling default `vcpkg` dependencies build (both `debug`/`release`) to ensure MSVC CRT matches the active configuration.")
+  set(MULTIPASS_VCPKG_BUILD_DEFAULT ON CACHE BOOL "" FORCE)
+endif()
+
 if(NOT MULTIPASS_VCPKG_BUILD_DEFAULT)
   message(STATUS "Will build `vcpkg` dependencies in `release-only` mode.")
-
-  # Propagate macOS deployment target to vcpkg triplet
-  if(APPLE AND DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(VCPKG_TRIPLETS_DIR "${CMAKE_CURRENT_BINARY_DIR}/vcpkg-triplets")
-    configure_file(
-      "${CMAKE_CURRENT_SOURCE_DIR}/3rd-party/vcpkg-triplets/osx-release.cmake.in"
-      "${VCPKG_TRIPLETS_DIR}/${VCPKG_HOST_ARCH}-${VCPKG_HOST_OS}-release.cmake"
-      @ONLY
-    )
-    set(VCPKG_OVERLAY_TRIPLETS "${VCPKG_TRIPLETS_DIR}" CACHE STRING "Custom vcpkg triplets directory")
-    message(STATUS "Generated vcpkg triplet: ${VCPKG_HOST_ARCH}-${VCPKG_HOST_OS}-release.cmake with deployment target ${CMAKE_OSX_DEPLOYMENT_TARGET}")
-  endif()
-
   set(VCPKG_HOST_TRIPLET "${VCPKG_HOST_ARCH}-${VCPKG_HOST_OS}-release")
   set(VCPKG_TARGET_TRIPLET "${VCPKG_HOST_ARCH}-${VCPKG_HOST_OS}-release")
+  set(VCPKG_BUILD_TYPE_SETTING "set(VCPKG_BUILD_TYPE release)")
 else()
   set(VCPKG_HOST_TRIPLET "${VCPKG_HOST_ARCH}-${VCPKG_HOST_OS}")
   set(VCPKG_TARGET_TRIPLET "${VCPKG_HOST_ARCH}-${VCPKG_HOST_OS}")
+  set(VCPKG_BUILD_TYPE_SETTING "") # build both debug and release
   message(NOTICE "Will build `vcpkg` deps in both `debug` and `release` configurations. Be aware that it will take around twice the time to build the `vcpkg` deps.")
+endif()
+
+# Propagate macOS deployment target and compiler flags to the vcpkg triplet. Generate it for both
+# build modes; in the default mode it overlays vcpkg's stock triplet of the same name.
+if(APPLE AND DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+  set(VCPKG_TRIPLETS_DIR "${CMAKE_CURRENT_BINARY_DIR}/vcpkg-triplets")
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rd-party/vcpkg-triplets/osx.cmake.in"
+    "${VCPKG_TRIPLETS_DIR}/${VCPKG_TARGET_TRIPLET}.cmake"
+    @ONLY
+  )
+  set(VCPKG_OVERLAY_TRIPLETS "${VCPKG_TRIPLETS_DIR}" CACHE STRING "Custom vcpkg triplets directory")
+  message(STATUS "Generated vcpkg triplet: ${VCPKG_TARGET_TRIPLET}.cmake with deployment target ${CMAKE_OSX_DEPLOYMENT_TARGET}")
 endif()
 
 message(STATUS "Bootstrapping vcpkg...")
@@ -295,11 +305,15 @@ if(MSVC)
   add_definitions(-D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
   add_definitions(-DWIN32_LEAN_AND_MEAN)
   add_definitions(-DSECURITY_WIN32)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/EHsc>)
   set(MULTIPASS_PLATFORM windows)
 else()
   add_compile_options(-Werror -Wall -pedantic -fPIC)
 
   if(APPLE)
+    # Calling an API newer than the deployment target without an availability check binds it as a
+    # weak import that resolves to NULL on older macOS, crashing at the call site
+    add_compile_options(-Werror=unguarded-availability-new)
     add_definitions(-DMULTIPASS_PLATFORM_APPLE)
     set(MULTIPASS_PLATFORM macos)
     add_definitions(-DMULTIPASS_COMPILER_APPLE_CLANG)
@@ -353,17 +367,25 @@ if(CMAKE_BUILD_TYPE_LOWER  MATCHES "coverage")
       set(FLUTTER_COVERAGE_COMMANDS
         COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/src/client/gui
                 ${FLUTTER_EXECUTABLE} test --coverage
+        # Flutter emits package-relative paths (SF:lib/...), so the exclude
+        # patterns must not require a leading path segment before 'lib/'.
         COMMAND ${LCOV}
           --remove ${CMAKE_SOURCE_DIR}/src/client/gui/coverage/lcov.info
           --ignore-errors unused
-          '*/lib/generated/*'
-          '*/lib/l10n/*'
+          '*lib/generated/*'
+          '*lib/l10n/*'
           --output-file ${CMAKE_SOURCE_DIR}/src/client/gui/coverage/lcov.info
         COMMAND ${LCOV}
           --add-tracefile coverage.cleaned
           --add-tracefile lcov.info
           --add-tracefile ${CMAKE_SOURCE_DIR}/src/client/gui/coverage/lcov.info
           --output-file total_coverage.info
+        # Flutter emits package-relative paths (SF:lib/...). Rewrite the merged
+        # report so the Dart entries line up with the repo source tree.
+        COMMAND ${CMAKE_COMMAND}
+          -DLCOV_FILE=total_coverage.info
+          -DSOURCE_PREFIX=${CMAKE_SOURCE_DIR}/src/client/gui
+          -P ${CMAKE_SOURCE_DIR}/src/cmake/rewrite-flutter-coverage-paths.cmake
       )
       set(GENHTML_SOURCE_ARGS --source-directory ${CMAKE_SOURCE_DIR}/src/client/gui)
     else()

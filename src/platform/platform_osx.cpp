@@ -344,6 +344,12 @@ mp::VirtualMachineFactory::UPtr mp::platform::vm_backend(const mp::Path& data_di
     throw std::runtime_error(fmt::format("Unsupported virtualization driver: {}", driver));
 }
 
+bool mp::platform::backend_supports_availability_zones()
+{
+    const auto driver = MP_SETTINGS.get(mp::driver_key);
+    return driver != QStringLiteral("virtualbox");
+}
+
 std::unique_ptr<mp::Process> mp::platform::make_sshfs_server_process(
     const mp::SSHFSServerConfig& config)
 {
@@ -423,6 +429,7 @@ std::string mp::platform::reinterpret_interface_id(const std::string& ux_id)
 
 std::filesystem::path mp::platform::Platform::get_root_cert_dir() const
 {
+    // Remember to update the uninstall script on changes:
     static const std::filesystem::path base_dir = "/usr/local/etc";
     return base_dir / daemon_name;
 }

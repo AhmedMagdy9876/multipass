@@ -87,8 +87,10 @@ message LaunchError {
         INVALID_HOSTNAME = 3;
         INVALID_NETWORK = 4;
         ZONE_UNAVAILABLE = 5;
+        INSTANCE_NAME_TOO_LONG = 6;
     }
     repeated ErrorCodes error_codes = 1;
+    optional uint32 max_instance_name_len = 2;
 }
 
 message LaunchProgress {
@@ -485,10 +487,18 @@ message SetRequest {
     bool authorized = 4;
 }
 
+// TODO hyperv migration, remove
+message HCSMigrationReport {
+    string phase = 1;
+    string summary = 2;
+}
+
 message SetReply {
     string log_line = 1;
     string reply_message = 2;
     bool needs_authorization = 3;
+    // TODO hyperv migration, remove (and add `reserved 4;`)
+    HCSMigrationReport hcs_migration_report = 4;
 }
 
 message KeysRequest {
@@ -553,6 +563,7 @@ message DaemonInfoReply {
     uint64 available_space = 2;
     uint32 cpus = 3;
     uint64 memory = 4;
+    uint32 max_instance_name_len = 5;
 }
 
 message WaitReadyRequest {

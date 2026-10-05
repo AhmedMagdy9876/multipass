@@ -87,7 +87,7 @@ struct AppleVZVirtualMachine_UnitTests : public testing::Test
         EXPECT_CALL(mock_applevz, get_state(_)).WillRepeatedly(Return(initial_state));
         EXPECT_CALL(mock_monitor, persist_state_for(desc.vm_name, _)).Times(AnyNumber());
 
-        EXPECT_CALL(mock_image_utils, convert_to_supported_format(_, _))
+        EXPECT_CALL(mock_image_utils, convert_to_supported_format(_))
             .WillRepeatedly(ReturnArg<0>());
         EXPECT_CALL(mock_image_utils, resize_image(_, _)).WillRepeatedly(Return());
 
@@ -256,7 +256,9 @@ TEST_F(AppleVZVirtualMachine_UnitTests, shutdownForcedStopError)
 {
     auto uut = construct_vm(applevz::AppleVMState::running);
 
-    EXPECT_CALL(mock_applevz, get_state(_)).WillOnce(Return(applevz::AppleVMState::running));
+    EXPECT_CALL(mock_applevz, get_state(_))
+        .WillOnce(Return(applevz::AppleVMState::running))
+        .WillRepeatedly(Return(applevz::AppleVMState::stopped));
 
     EXPECT_CALL(mock_applevz, can_stop(_)).WillOnce(Return(true));
     EXPECT_CALL(mock_applevz, stop_vm(_, true))
@@ -298,5 +300,21 @@ TEST_F(AppleVZVirtualMachine_UnitTests, suspendThrowsNotImplemented)
     EXPECT_CALL(mock_applevz, get_state(_)).WillRepeatedly(Return(applevz::AppleVMState::running));
 
     EXPECT_THROW(uut->suspend(), mp::NotImplementedOnThisBackendException);
+}
+
+TEST_F(AppleVZVirtualMachine_UnitTests, currentStateReportsUnavailableWhenZoneUnavailable)
+{
+    auto uut = construct_vm(applevz::AppleVMState::running);
+
+    EXPECT_CALL(mock_applevz, get_state(_))
+        .WillOnce(Return(applevz::AppleVMState::running))
+        .WillRepeatedly(Return(applevz::AppleVMState::stopped));
+
+    EXPECT_CALL(mock_applevz, can_stop(_)).WillOnce(Return(true));
+    EXPECT_CALL(mock_applevz, stop_vm(_, true)).WillOnce(Return(applevz::CFError{}));
+
+    uut->set_available(false);
+
+    EXPECT_EQ(uut->current_state(), VirtualMachine::State::unavailable);
 }
 }; // namespace multipass::test

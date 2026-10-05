@@ -9,7 +9,7 @@
             }
         }
     },
-    "vmStatusLabel": "{status, select, running{Running} stopped{Stopped} suspended{Suspended} restarting{Restarting} starting{Starting} suspending{Suspending} deleted{Deleted} delayed_shutdown{Delayed shutdown} launching{Launching} other{}}",
+    "vmStatusLabel": "{status, select, running{Running} stopped{Stopped} suspended{Suspended} restarting{Restarting} starting{Starting} suspending{Suspending} deleted{Deleted} delayed_shutdown{Delayed shutdown} launching{Launching} unavailable{Unavailable} other{}}",
     "@vmStatusLabel": {
         "description": "Display label for a VM status. The 'status' parameter is the lowercase protobuf enum name (running, stopped, suspended, restarting, starting, suspending, deleted, delayed_shutdown) or 'launching'.",
         "placeholders": {
@@ -306,6 +306,10 @@
     "@usagePrimaryNameErrorTooShort": {
         "description": "Validation error when the primary instance name is too short"
     },
+    "usagePrimaryNameErrorTooLong": "Name too long",
+    "@usagePrimaryNameErrorTooLong": {
+        "description": "Validation error when the primary instance name is too long"
+    },
     "usagePrimaryNameErrorEndChar": "Name must end in digit or letter",
     "@usagePrimaryNameErrorEndChar": {
         "description": "Validation error when the primary instance name ends with a hyphen"
@@ -343,6 +347,34 @@
                 "type": "String"
             }
         }
+    },
+    "migrationInProgress": "Migrating instances to Host Compute System (HCS)\n",
+    "@migrationInProgress": {
+        "description": "Bold heading in the notification shown while instances migrate to the hcs driver"
+    },
+    "migrationDone": "Switched to Host Compute System (HCS)\n",
+    "@migrationDone": {
+        "description": "Bold heading in the notification shown when switching to the hcs driver finished"
+    },
+    "migrationDoneWithProblems": "Switched to Host Compute System (HCS), but not every instance was migrated\n",
+    "@migrationDoneWithProblems": {
+        "description": "Bold heading in the notification shown when the hcs driver is in effect but some instances failed to migrate"
+    },
+    "migrationQuitTitle": "Quit during migration?",
+    "@migrationQuitTitle": {
+        "description": "Title of the dialog shown when quitting the app while instances migrate to the hcs driver"
+    },
+    "migrationQuitMessage": "Instances are being migrated to Host Compute System (HCS). Quitting now stops the migration after the current instance: the driver is still switched, but the remaining instances are not migrated.",
+    "@migrationQuitMessage": {
+        "description": "Body of the dialog shown when quitting the app while instances migrate to the hcs driver"
+    },
+    "migrationQuitAction": "Quit anyway",
+    "@migrationQuitAction": {
+        "description": "Button that quits the app, stopping the ongoing migration"
+    },
+    "migrationQuitKeepAction": "Keep migrating",
+    "@migrationQuitKeepAction": {
+        "description": "Button that closes the dialog and lets the migration continue"
     },
     "virtualizationBridgedNetworkNone": "None",
     "@virtualizationBridgedNetworkNone": {
@@ -575,6 +607,10 @@
     "@vmDetailsStopToConfigure": {
         "description": "Tooltip shown on the Configure button when the instance is running"
     },
+    "vmDetailsUnavailableToMount": "Instance is unavailable",
+    "@vmDetailsUnavailableToMount": {
+        "description": "Tooltip shown on the mounts Add mount/Configure buttons when the instance is unavailable"
+    },
     "resourcesTitle": "Resources",
     "@resourcesTitle": {
         "description": "Section heading on the Resources details tab"
@@ -747,6 +783,46 @@
     "@vmTableAllInstances": {
         "description": "Page heading above the VM table"
     },
+    "vmTableZoneUnsupported": "n/a",
+    "@vmTableZoneUnsupported": {
+        "description": "Displayed in the Zone column when availability zones are not supported by the current backend"
+    },
+    "vmTableZonesButtonTitle": "Zones",
+    "@vmTableZonesButtonTitle": {
+        "description": "Title label for zones button in the VM table"
+    },
+    "vmTableZonesButtonTooltip": "Change zone availability",
+    "@vmTableZonesButtonTooltip": {
+        "description": "Tooltip for zones button in the VM table"
+    },
+    "vmTableZonesPopupTitle": "Enable/disable zones",
+    "@vmTableZonesPopupTitle": {
+        "description": "Title label for zones popup in the VM table"
+    },
+    "vmTableZonesRunningInstanceCount": "{count} running {count, plural, =1{instance} other{instances}}",
+    "@vmTableZonesRunningInstanceCount": {
+        "description": "Refers to number of running VM instances in zones popup in the VM table",
+        "placeholders": {
+            "count": {
+                "type": "int",
+                "description": "Number of running VM instances"
+            }
+        }
+    },
+    "vmTableZonesUnavailableLabel": "{unavailable} out of {total} zones {unavailable, plural, =1{is} other{are}} unavailable",
+    "@vmTableZonesUnavailableLabel": {
+        "description": "Label to indicate that some zones are unavailable in the VM table",
+        "placeholders": {
+            "unavailable": {
+                "type": "int",
+                "description": "Number of unavailable zones"
+            },
+            "total": {
+                "type": "int",
+                "description": "Number of total zones"
+            }
+        }
+    },
     "commonLaunch": "Launch",
     "@commonLaunch": {
         "description": "Button label that opens the catalogue to launch a new instance"
@@ -915,9 +991,68 @@
     "@launchFormNameErrorDeletedInUse": {
         "description": "Validation error when instance name belongs to a deleted instance"
     },
+    "launchFormEnableZoneLabel": "Enable zone",
+    "@launchFormEnableZoneLabel": {
+        "description": "Button label to enable a zone"
+    },
+    "launchFormEnableZoneSuccess": "{zone} enabled",
+    "@launchFormEnableZoneSuccess": {
+        "description": "Success message when enabling a zone",
+        "placeholders": {
+            "zone": {
+                "type": "String"
+            }
+        }
+    },
+    "launchFormEnableAllZonesLabel": "Enable all zones",
+    "@launchFormEnableAllZonesLabel": {
+        "description": "Button label to enable all zones"
+    },
+    "launchFormEnableAllZonesSuccess": "All zones enabled",
+    "@launchFormEnableAllZonesSuccess": {
+        "description": "Success message when enabling all zones"
+    },
+    "launchFormAllZonesUnavailableTooltip": "All zones are unavailable",
+    "@launchFormAllZonesUnavailableTooltip": {
+        "description": "Launch button tooltip when all zones are unavailable"
+    },
+    "launchFormSelectedZoneUnavailableTooltip": "Enable selected zone to launch",
+    "@launchFormSelectedZoneUnavailableTooltip": {
+        "description": "Launch button tooltip when selected zone is unavailable"
+    },
     "trayToggleWindow": "Toggle window",
     "@trayToggleWindow": {
         "description": "Tray menu item label to show or hide the main window"
+    },
+    "zoneDropdownTitle": "Zone",
+    "@zoneDropdownTitle": {
+        "description": "Title for zone dropdown"
+    },
+    "zoneDropdownTooltip": "Zones simulate availability zones in public clouds\nand allow for testing resilience against real-world incidents",
+    "@zoneDropdownTooltip": {
+        "description": "Tooltip for zone dropdown"
+    },
+    "zoneDropdownUnavailableZone": "{zone} (unavailable)",
+    "@zoneDropdownUnavailableZone": {
+        "description": "Dropdown entry for unavailable zone",
+        "placeholders": {
+            "zone": {
+                "type": "String"
+            }
+        }
+    },
+    "zoneDropdownAllZonesUnavailableError": "All zones are unavailable",
+    "@zoneDropdownAllZonesUnavailableError": {
+        "description": "Error when all zones are unavailable"
+    },
+    "zoneDropdownSelectedZoneUnavailableError": "{zone} is unavailable",
+    "@zoneDropdownSelectedZoneUnavailableError": {
+        "description": "Error when selected zone is unavailable",
+        "placeholders": {
+            "zone": {
+                "type": "String"
+            }
+        }
     },
     "trayMultipassVersion": "multipass version: {version}",
     "@trayMultipassVersion": {

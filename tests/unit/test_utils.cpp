@@ -19,6 +19,7 @@
 #include "file_operations.h"
 #include "mock_file_ops.h"
 #include "mock_openssl_syscalls.h"
+#include "mock_platform.h"
 #include "mock_ssh_process.h"
 #include "temp_dir.h"
 #include "temp_file.h"
@@ -327,6 +328,20 @@ TEST(Utils, toCmdArgumentsWithDoubleQuotesAreEscaped)
     EXPECT_THAT(output, ::testing::StrEq("they said \\\"please\\\""));
 }
 
+TEST(Utils, maxInstanceNameLengthDelegatesToPlatform)
+{
+    const auto* some_dir_cstr = "/whatever";
+    const mp::Path some_dir_qstr{some_dir_cstr};
+    const std::filesystem::path some_dir_std_path{some_dir_cstr};
+
+    auto [mock_platform, guard] = mpt::MockPlatform::inject();
+    EXPECT_CALL(*mock_platform, get_maximum_file_name_length(some_dir_std_path))
+        .WillOnce(Return(123u));
+
+    auto result = MP_UTILS.max_instance_name_length(some_dir_qstr);
+    EXPECT_EQ(result, 123u);
+}
+
 // clang-format off
 template <typename Func, typename... ExtraArgs>
 concept expected_trim_traits =
@@ -394,7 +409,7 @@ TEST(Utils, trimNewlineAssertionWorks)
 {
     std::string s{"wrong"};
     // https://google.github.io/googletest/advanced.html#regular-expression-syntax
-    ASSERT_DEBUG_DEATH(mp::utils::trim_newline(s), "[Aa]ssert");
+    ASSERT_DEBUG_DEATH(mp::utils::trim_newline(s), "ssert");
 }
 
 TEST_F(TestTrimUtilities, trimRvalue)

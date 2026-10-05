@@ -41,7 +41,7 @@ AppleVZVirtualMachine::AppleVZVirtualMachine(const VirtualMachineDescription& de
                                              const SSHKeyProvider& key_provider,
                                              AvailabilityZone& zone,
                                              const Path& instance_dir)
-    : BaseVirtualMachine{desc.vm_name, desc, key_provider, zone, instance_dir}, monitor{&monitor}
+    : BaseVirtualMachine{desc.vm_name, desc, monitor, key_provider, zone, instance_dir}
 {
     initialize_vm_handle();
 }
@@ -116,7 +116,7 @@ void AppleVZVirtualMachine::shutdown(ShutdownPolicy shutdown_policy)
     std::unique_lock<std::mutex> lock{state_mutex};
     if (!vm_handle)
     {
-        assert(state == State::stopped);
+        assert(state == State::stopped || state == State::unavailable);
         return;
     }
 
@@ -171,7 +171,6 @@ void AppleVZVirtualMachine::shutdown(ShutdownPolicy shutdown_policy)
         }
         else
         {
-            // Go nuclear and just kill the VM process
             mpl::warn(
                 log_category,
                 "shutdown() -> VM `{}` cannot be stopped from state `{}`, killing process instead",
@@ -249,25 +248,8 @@ void AppleVZVirtualMachine::suspend()
 VirtualMachine::State AppleVZVirtualMachine::current_state()
 {
     // Get state from AppleVZ, translate it to our state enum, and notify the monitor
-    if (!vm_handle)
-        return State::stopped;
     set_state(MP_APPLEVZ.get_state(vm_handle));
     return state;
-}
-
-int AppleVZVirtualMachine::ssh_port()
-{
-    return 22;
-}
-
-std::string AppleVZVirtualMachine::ssh_hostname()
-{
-    return require_management_ipv4().as_string();
-}
-
-std::string AppleVZVirtualMachine::ssh_username()
-{
-    return desc.ssh_username;
 }
 
 std::optional<IPAddress> AppleVZVirtualMachine::management_ipv4()
@@ -281,31 +263,23 @@ std::optional<IPAddress> AppleVZVirtualMachine::management_ipv4()
 void AppleVZVirtualMachine::handle_state_update()
 {
     if (update_shutdown_status)
-        monitor->persist_state_for(vm_name, state);
-}
-
-void AppleVZVirtualMachine::update_cpus(int num_cores)
-{
-    assert(num_cores > 0);
-    desc.num_cores = num_cores;
-}
-
-void AppleVZVirtualMachine::resize_memory(const MemorySize& new_size)
-{
-    desc.mem_size = new_size;
+        monitor.persist_state_for(vm_name, state);
 }
 
 void AppleVZVirtualMachine::resize_disk_impl(const MemorySize& new_size)
 {
-    assert(new_size > desc.disk_space);
-
     MP_APPLEVZ_UTILS.resize_image(new_size, desc.image.image_path);
-    desc.disk_space = new_size;
 }
 
 void AppleVZVirtualMachine::set_state(applevz::AppleVMState vm_state)
 {
     mpl::debug(log_category, "set_state() -> VM `{}` VZ state `{}`", vm_name, vm_state);
+
+    if (state == State::unavailable)
+    {
+        mpl::debug(log_category, "set_state() -> Zone for VM `{}` is unavailable", vm_name);
+        return;
+    }
 
     const auto prev_state = state;
     switch (vm_state)

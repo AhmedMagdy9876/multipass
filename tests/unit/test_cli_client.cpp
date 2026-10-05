@@ -435,7 +435,7 @@ struct Client : public Test
     }
 
 #ifdef WIN32
-    std::string server_address{"localhost:50051"};
+    std::string server_address{multipass::default_grpc_server_tcp_listen_address};
 #else
     std::string server_address{"unix:/tmp/test-multipassd.socket"};
 #endif
@@ -1329,6 +1329,24 @@ TEST_F(Client, launchCmdWithUnavailableZoneFails)
             WithArg<1>(check_request_and_return<mp::LaunchReply, mp::LaunchRequest>(request_matcher,
                                                                                     failure)));
     EXPECT_THAT(send_command({"launch", "--zone", "zone1"}), Eq(mp::ReturnCode::CommandFail));
+}
+
+TEST_F(Client, launchCmdTooLongInstanceNameFails)
+{
+    const auto some_long_string = QString("some_long_string").repeated(20).toStdString();
+    const auto request_matcher = Property(&mp::LaunchRequest::instance_name,
+                                          StrEq(some_long_string));
+    mp::LaunchError launch_error;
+    launch_error.add_error_codes(mp::LaunchError::INSTANCE_NAME_TOO_LONG);
+    const auto failure = grpc::Status{grpc::StatusCode::INVALID_ARGUMENT,
+                                      "msg",
+                                      launch_error.SerializeAsString()};
+    EXPECT_CALL(mock_daemon, launch)
+        .WillOnce(
+            WithArg<1>(check_request_and_return<mp::LaunchReply, mp::LaunchRequest>(request_matcher,
+                                                                                    failure)));
+    EXPECT_THAT(send_command({"launch", "--name", std::move(some_long_string)}),
+                Eq(mp::ReturnCode::CommandFail));
 }
 
 TEST_F(Client, launchCmdWithTimer)
